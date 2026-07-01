@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SYSTEM OVERRIDE DETECTED</title>
+    <style>
+        /* CSS Variables - Hacker Theme */
+        :root {
+            --green: #00ff00;
+            --dark-green: #003300;
+            --red: #ff003c;
+            --cyan: #00f0ff;
+            --yellow: #fcee0a;
+            --white: #ffffff;
+            --bg: #050505;
+            --crt-curvature: inset 0 0 100px rgba(0,255,0,0.15);
+        }
+
+        /* Basic Reset */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body, html {
+            width: 100%; height: 100%;
+            background-color: var(--bg);
+            color: var(--green);
+            font-family: 'Courier New', Courier, monospace;
+            overflow: hidden;
+            user-select: none;
+            cursor: crosshair;
+        }
+
+        /* Hidden Audio Elements */
+        audio { display: none; }
+
+        /* Invisible Overlay to Catch First Interaction for Audio Playback */
+        #interaction-catcher {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            z-index: 10000;
+            background: transparent;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Flashing initial instruction to encourage a tap */
+        #tap-instruction {
+            color: var(--green);
+            font-size: 1.5rem;
+            animation: blink-caret 1s infinite;
+            background: rgba(0,0,0,0.8);
+            padding: 10px 20px;
+            border: 1px solid var(--green);
+            pointer-events: none;
+        }
+
+        /* Matrix Background */
+        #matrix-canvas {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            z-index: 1;
+            opacity: 0.25;
+        }
+
+        /* 3D CRT Screen Curve Effect */
+        .screen-container {
+            position: relative;
+            width: 100%; height: 100%;
+            z-index: 10;
+            box-shadow: var(--crt-curvature);
+            display: flex;
+            padding: 15px;
+            gap: 15px;
+        }
+
+        /* Scanlines & Flicker Effects */
+        .scanlines {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.4) 50%, rgba(0,0,0,0.4));
+            background-size: 100% 4px;
+            pointer-events: none; z-index: 998;
+        }
+
+        .crt-flicker {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(255, 0, 0, 0.02);
+            pointer-events: none; z-index: 999;
+            animation: crtFlicker 0.12s infinite;
+        }
+
+        @keyframes crtFlicker {
+            0% { opacity: 0.05; } 50% { opacity: 0.02; } 100% { opacity: 0.08; }
+        }
+
+        /* Layout Design: Sidebar & Main */
+        .sidebar {
+            width: 30%;
+            height: 100%;
+            border-right: 2px solid var(--dark-green);
+            display: flex;
+            flex-direction: column;
+            padding-right: 15px;
+        }
+
+        .main-terminal {
+            width: 70%;
+            height: 100%;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Fake Radar Animation */
+        .radar-box {
+            width: 100%; aspect-ratio: 1;
+            border: 1px solid var(--red);
+            border-radius: 50%;
+            position: relative;
+            margin-bottom: 20px;
+            overflow: hidden;
+            background: radial-gradient(circle, rgba(255,0,0,0.15) 0%, rgba(0,0,0,0) 70%);
+            box-shadow: 0 0 20px rgba(255,0,0,0.3);
+        }
+        
+        .radar-sweep {
+            position: absolute; top: 50%; left: 50%;
+            width: 50%; height: 50%;
+            background: linear-gradient(45deg, rgba(255,0,0,0) 0%, rgba(255,0,0,0.9) 100%);
+            transform-origin: 0% 0%;
+            animation: sweep 1.5s linear infinite;
+        }
+
+        @keyframes sweep { 100% { transform: rotate(360deg); } }
+
+        /* Hex Memory Dump Area */
+        .hex-dump {
+            flex-grow: 1;
+            overflow: hidden;
+            font-size: 0.75rem;
+            color: var(--dark-green);
+            word-wrap: break-word;
+            line-height: 1.3;
+        }
+
+        /* Screen Sections */
+        #boot-screen, #terminal-output, #surprise-screen {
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%;
+            display: flex; flex-direction: column;
+        }
+
+        #boot-screen { justify-content: center; align-items: flex-start; z-index: 20; background: rgba(0,0,0,0.95); padding: 40px; display: none; }
+        #terminal-output { display: none; justify-content: flex-end; padding-bottom: 20px; overflow: hidden; z-index: 15; }
+        
+        /* Surprise Screen Overlay */
+        #surprise-screen { 
+            display: none; 
+            justify-content: center; 
+            align-items: center; 
+            z-index: 50; 
+            background: rgba(0,0,0,0.85); 
+            text-align: center; 
+            backdrop-filter: blur(5px);
+        }
+
+        /* ASCII Art Styling */
+        .ascii-art {
+            white-space: pre; font-size: 0.65rem; color: var(--red);
+            text-shadow: 0 0 10px var(--red); margin-bottom: 20px;
+            animation: glitchAnim 2s infinite;
+            font-weight: bold;
+        }
+
+        /* Typography & Colors */
+        .text-line { margin: 3px 0; text-shadow: 0 0 5px currentColor; font-size: 1.15rem; }
+        .color-green { color: var(--green); }
+        .color-red { color: var(--red); font-weight: bold; text-shadow: 0 0 12px var(--red); }
+        .color-cyan { color: var(--cyan); }
+        .color-yellow { color: var(--yellow); }
+        .color-white { color: var(--white); }
+        
+        .typewriter-line {
+            display: inline-block;
+            overflow: hidden;
+            white-space: nowrap;
+            border-right: 10px solid var(--red);
+            animation: typing 0.5s steps(40, end), blink-caret 0.5s step-end infinite;
+        }
+
+        @keyframes typing { from { width: 0 } to { width: 100% } }
+        @keyframes blink-caret { from, to { border-color: transparent } 50% { border-color: var(--red) } }
+
+        /* Progress Bar Animation */
+        .progress-container { width: 100%; margin: 20px 0; }
+        .progress-bar-wrap { width: 80%; height: 25px; border: 2px solid var(--red); display: flex; align-items: center; padding: 2px; }
+        .progress-bar-fill { height: 100%; background-color: var(--red); width: 0%; box-shadow: 0 0 15px var(--red); }
+
+        /* Glitch Effects */
+        .severe-glitch {
+            animation: rgbSplit 0.1s linear infinite;
+        }
+        @keyframes rgbSplit {
+            0% { text-shadow: -3px 0 red, 3px 0 cyan; transform: translate(2px, 1px); }
+            50% { text-shadow: 3px 0 red, -3px 0 cyan; transform: translate(-2px, -1px); }
+            100% { text-shadow: -3px 0 red, 3px 0 cyan; transform: translate(2px, -1px); }
+        }
+
+        /* Surprise Text Styling */
+        #surprise-text {
+            font-size: clamp(3rem, 10vw, 7rem);
+            color: var(--white);
+            text-shadow: 0 0 20px #fff, 0 0 40px var(--cyan), 0 0 60px var(--cyan), 0 0 80px var(--cyan), 0 0 100px var(--cyan);
+            opacity: 0; transform: scale(0.3);
+            transition: all 2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        #surprise-subtext {
+            font-size: clamp(1.5rem, 5vw, 3rem);
+            color: var(--yellow); margin-top: 30px; opacity: 0;
+            text-shadow: 0 0 15px var(--yellow);
+            transition: opacity 2s ease 1s;
+        }
+        .show-surprise #surprise-text { opacity: 1; transform: scale(1); }
+        .show-surprise #surprise-subtext { opacity: 1; }
+
+        /* Confetti & FX Canvas */
+        #fx-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 45; pointer-events: none; }
+        
+        /* Mobile Layout Adjustments */
+        @media (max-width: 768px) {
+            .sidebar { display: none; }
+            .main-terminal { width: 100%; }
+            .ascii-art { font-size: 0.45rem; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- Exact Audio File Names Referenced Here -->
+    <audio id="siren1" loop preload="auto">
+        <source src="freesound_community-siren-alert-96052.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="siren2" loop preload="auto">
+        <source src="freesound_community-alert-33762.mp3" type="audio/mpeg">
+    </audio>
+
+    <!-- Invisible Overlay to catch the first click/touch to enable audio -->
+    <div id="interaction-catcher">
+        <div id="tap-instruction">TAP SCREEN TO INITIALIZE</div>
+    </div>
+
+    <!-- Background Elements -->
+    <canvas id="matrix-canvas"></canvas>
+    <div class="scanlines"></div>
+    <div class="crt-flicker"></div>
+    <canvas id="fx-canvas"></canvas>
+
+    <div class="screen-container">
+        
+        <!-- SIDEBAR (Fake Radar & Data) -->
+        <div class="sidebar">
+            <div class="radar-box">
+                <div class="radar-sweep"></div>
+                <div style="position:absolute;top:50%;width:100%;height:1px;background:rgba(255,0,0,0.5);"></div>
+                <div style="position:absolute;left:50%;width:1px;height:100%;background:rgba(255,0,0,0.5);"></div>
+                <div style="position:absolute;top:25%;left:25%;width:5px;height:5px;background:red;border-radius:50%;box-shadow:0 0 10px red;animation:blink-caret 1s infinite;"></div>
+                <div style="position:absolute;top:70%;left:60%;width:5px;height:5px;background:red;border-radius:50%;box-shadow:0 0 10px red;animation:blink-caret 1.5s infinite;"></div>
+            </div>
+            <div style="color:var(--red); margin-bottom: 5px; font-weight:bold; font-size:1.1rem;">DATA_EXTRACTION [0x8F9A]</div>
+            <div class="hex-dump" id="hex-dump-container"></div>
+        </div>
+
+        <!-- MAIN TERMINAL SCREEN -->
+        <div class="main-terminal">
+            
+            <!-- BOOT / HACKING INITIATION SEQUENCE -->
+            <div id="boot-screen">
+                <div class="ascii-art">
+   _____  .__             .__   __          
+  /  _  \ |  |   ____   __|  |_/  |_  ______
+ /  /_\  \|  | _/ __ \ / __ |   __\/  ___/
+/    |    \  |_\  ___// /_/ | |  |  \___ \ 
+\____|__  /____/\___  >____ | |__| /____  >
+        \/          \/     \/           \/ 
+        WARNING: UNAUTHORIZED ACCESS DETECTED
+                </div>
+                <div id="boot-text-container"></div>
+                <div class="progress-container" id="progress-container" style="display:none;">
+                    <div style="color:var(--red); font-weight:bold; font-size:1.2rem; margin-bottom:10px;">
+                        BYPASSING FIREWALL... <span id="progress-text">0%</span>
+                    </div>
+                    <div class="progress-bar-wrap">
+                        <div class="progress-bar-fill" id="progress-fill"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SCROLLING HACKER TERMINAL -->
+            <div id="terminal-output"></div>
+
+        </div>
+
+    </div>
+
+    <!-- SURPRISE ENDING -->
+    <div id="surprise-screen">
+        <h1 id="surprise-text" class="severe-glitch">🎉 HAPPY BIRTHDAY! 🎉</h1>
+        <p id="surprise-subtext">SYSTEM SUCCESSFULLY HIJACKED FOR YOUR BIRTHDAY!<br>Have an amazing day!</p>
+    </div>
+
+    <script>
+        /* -------------------------------------- */
+        /* AUDIO & SYSTEM CONTROLLER */
+        /* -------------------------------------- */
+        const s1 = document.getElementById('siren1');
+        const s2 = document.getElementById('siren2');
+        const interactionCatcher = document.getElementById('interaction-catcher');
+        let prankStarted = false;
+
+        // Try to start immediately (will likely be blocked by browser)
+        window.addEventListener('load', () => {
+            initMatrix(); // Start matrix background immediately
+            startHexDump(); // Start sidebar hex dump immediately
+        });
+
+        // The critical function to start the audio and sequence
+        function startPrank() {
+            if (prankStarted) return;
+            prankStarted = true;
+
+            // Hide the interaction catcher overlay
+            interactionCatcher.style.display = 'none';
+
+            // Attempt to play audio
+            try {
+                s1.volume = 0.8;
+                s2.volume = 1.0;
+                let playPromise1 = s1.play();
+                let playPromise2 = s2.play();
+
+                if (playPromise1 !== undefined) {
+                    playPromise1.catch(error => console.error("Audio 1 blocked by browser:", error));
+                }
+                if (playPromise2 !== undefined) {
+                    playPromise2.catch(error => console.error("Audio 2 blocked by browser:", error));
+                }
+            } catch (err) {
+                console.error("Audio play error:", err);
+            }
+
+            // Show boot screen and start sequence
+            document.getElementById('boot-screen').style.display = 'flex';
+            startBootSequence();
+            
+            // Fullscreen attempt (Works on many mobile browsers when clicked)
+            try {
+                if (document.documentElement.requestFullscreen) {
+                    document.documentElement.requestFullscreen();
+                } else if (document.documentElement.webkitRequestFullscreen) { /* Safari */
+                    document.documentElement.webkitRequestFullscreen();
+                }
+            } catch (e) {
+                console.log("Fullscreen request failed.");
+            }
+        }
+
+        // Catch ANY interaction to start the prank (click, touch, key press)
+        interactionCatcher.addEventListener('click', startPrank);
+        interactionCatcher.addEventListener('touchstart', startPrank);
+        window.addEventListener('keydown', startPrank);
+
+        /* --- MATRIX RAIN EFFECT --- */
+        const mCanvas = document.getElementById('matrix-canvas');
+        const mCtx = mCanvas.getContext('2d');
+        let mWidth, mHeight;
+        const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789$+-*/=%\"'#&_(),.;:?!\\|{}<>[]^~";
+        const drops = [];
+        const fontSize = 16;
+
+        function initMatrix() {
+            mWidth = mCanvas.width = window.innerWidth;
+            mHeight = mCanvas.height = window.innerHeight;
+            let columns = mWidth / fontSize;
+            for(let x = 0; x < columns; x++) drops[x] = 1;
+            setInterval(drawMatrix, 40);
+        }
+
+        function drawMatrix() {
+            mCtx.fillStyle = "rgba(0, 0, 0, 0.1)";
+            mCtx.fillRect(0, 0, mWidth, mHeight);
+            mCtx.fillStyle = "#ff003c";
+            mCtx.font = fontSize + "px monospace";
+            
+            for(let i = 0; i < drops.length; i++) {
+                const text = chars.charAt(Math.floor(Math.random() * chars.length));
+                mCtx.fillText(text, i * fontSize, drops[i] * fontSize);
+                if(drops[i] * fontSize > mHeight && Math.random() > 0.975) drops[i] = 0;
+                drops[i]++;
+            }
+        }
+
+        /* --- SIDEBAR HEX DUMP GENERATOR --- */
+        function startHexDump() {
+            const hexContainer = document.getElementById('hex-dump-container');
+            setInterval(() => {
+                let dump = "";
+                for(let i=0; i<15; i++) {
+                    dump += "0x" + Math.floor(Math.random()*16777215).toString(16).toUpperCase().padStart(6, '0') + " ";
+                    for(let j=0; j<4; j++) {
+                        dump += Math.floor(Math.random()*255).toString(16).toUpperCase().padStart(2, '0') + " ";
+                    }
+                    dump += "<br>";
+                }
+                hexContainer.innerHTML = dump;
+            }, 100);
+        }
+
+        /* --- TEXT & TERMINAL LOGIC --- */
+        const bootPhrases = [
+            "WARNING: SYSTEM BREACH DETECTED...",
+            "INITIATING LOCKDOWN PROTOCOL...",
+            "LOCKDOWN FAILED. ROOT ACCESS COMPROMISED.",
+            "EXTRACTING SENSITIVE USER DATA...",
+            "DOWNLOADING PASSWORDS...",
+            "ACCESSING BANKING CREDENTIALS...",
+            "CRACKING ENCRYPTION KEYS..."
+        ];
+
+        const hackerPhrases = [
+            "FIREWALL BREACHED AT PORT 8080",
+            "UPLOADING TROJAN.EXE",
+            "IP TRACE FAILED - REROUTING...",
+            "DECRYPTING SECURE FILES...",
+            "INJECTING MALICIOUS SQL PAYLOAD...",
+            "MEMORY CORRUPTION DETECTED",
+            "FATAL ERROR: SYSTEM OVERLOAD",
+            "OVERRIDING KERNEL...",
+            "ACCESS GRANTED TO MAINFRAME",
+            "DOWNLOADING ALL IMAGES..."
+        ];
+
+        const birthdayPhrases = [
+            "SURPRISE PROTOCOL ACTIVATED...",
+            "LOADING CAKE_AND_CANDLES.DLL...",
+            "DECRYPTING BIRTHDAY WISHES...",
+            "PREPARING BIRTHDAY CELEBRATION...",
+            "SENDING VIRTUAL GIFTS...",
+            "HAPPINESS OVERLOAD DETECTED!",
+            "CELEBRATION MODE: ON"
+        ];
+
+        const terminalOutput = document.getElementById('terminal-output');
+        let terminalRunning = false;
+        let surpriseTriggered = false;
+
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+        async function typeText(element, text, speed = 15) {
+            element.innerHTML = '<span class="text-content"></span><span class="cursor" style="background:var(--red); color:var(--red);">█</span>';
+            const textContainer = element.querySelector('.text-content');
+            
+            for (let i = 0; i < text.length; i++) {
+                textContainer.textContent += text.charAt(i);
+                await sleep(speed + (Math.random() * 15));
+            }
+            element.querySelector('.cursor').remove();
+        }
+
+        async function startBootSequence() {
+            const bootContainer = document.getElementById('boot-text-container');
+            
+            for (let i = 0; i < bootPhrases.length; i++) {
+                const line = document.createElement('div');
+                line.className = 'text-line color-red';
+                if (i === bootPhrases.length - 1) line.className += ' severe-glitch';
+                
+                bootContainer.appendChild(line);
+                await typeText(line, "> " + bootPhrases[i], 10);
+                await sleep(150);
+            }
+            
+            await sleep(500);
+            
+            document.getElementById('progress-container').style.display = 'block';
+            const progressFill = document.getElementById('progress-fill');
+            const progressText = document.getElementById('progress-text');
+            
+            for (let p = 0; p <= 100; p += Math.floor(Math.random() * 5) + 1) {
+                if (p > 100) p = 100;
+                progressFill.style.width = p + '%';
+                progressText.innerText = p + '%';
+                await sleep(30);
+            }
+            
+            progressText.innerText = "100% - SUCCESS";
+            await sleep(500);
+            
+            document.getElementById('boot-screen').style.display = 'none';
+            startMainTerminal();
+        }
+
+        function startMainTerminal() {
+            document.getElementById('terminal-output').style.display = 'flex';
+            terminalRunning = true;
+            generateTerminalLine();
+            
+            setTimeout(triggerSurprise, 12000);
+        }
+
+        function generateTerminalLine() {
+            if (!terminalRunning) return;
+            
+            const line = document.createElement('div');
+            line.className = 'text-line ';
+            
+            let r = Math.random();
+            let text = "";
+            
+            if (surpriseTriggered) {
+                text = birthdayPhrases[Math.floor(Math.random() * birthdayPhrases.length)];
+                line.className += ['color-green', 'color-cyan', 'color-yellow', 'color-white'][Math.floor(Math.random()*4)];
+            } else {
+                if (r < 0.3) {
+                    text = "ERROR! " + hackerPhrases[Math.floor(Math.random() * hackerPhrases.length)];
+                    line.className += 'color-red severe-glitch';
+                } else if (r < 0.7) {
+                    text = hackerPhrases[Math.floor(Math.random() * hackerPhrases.length)];
+                    line.className += 'color-green';
+                } else {
+                    text = "SYS_LOG: " + Math.random().toString(36).substring(2, 15).toUpperCase();
+                    line.className += 'color-cyan';
+                }
+            }
+
+            let prefix = `[${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}.0.1] `;
+            line.textContent = prefix + text;
+            
+            terminalOutput.appendChild(line);
+            
+            if (terminalOutput.children.length > 50) {
+                terminalOutput.removeChild(terminalOutput.firstChild);
+            }
+            
+            terminalOutput.parentElement.scrollTop = terminalOutput.parentElement.scrollHeight;
+
+            let delay = surpriseTriggered ? (30 + Math.random()*50) : (10 + Math.random()*40);
+            setTimeout(generateTerminalLine, delay);
+        }
+
+        function triggerSurprise() {
+            surpriseTriggered = true;
+            const surpriseScreen = document.getElementById('surprise-screen');
+            surpriseScreen.style.display = 'flex';
+            
+            setTimeout(() => {
+                surpriseScreen.classList.add('show-surprise');
+                initFireworks();
+                // Audio continues automatically
+            }, 100);
+        }
+
+        /* --- VISUAL FX (Confetti & Fireworks on Canvas) --- */
+        const fxCanvas = document.getElementById('fx-canvas');
+        const fxCtx = fxCanvas.getContext('2d');
+        let particles = [];
+        let fireworks = [];
+        let fxW, fxH;
+
+        function resizeFx() {
+            fxW = fxCanvas.width = window.innerWidth;
+            fxH = fxCanvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeFx);
+        resizeFx();
+
+        function createConfetti() {
+            const colors = ['#00f0ff', '#fcee0a', '#00ff00', '#ff003c', '#ffffff'];
+            particles.push({
+                x: Math.random() * fxW,
+                y: -20,
+                vx: (Math.random() - 0.5) * 6,
+                vy: Math.random() * 4 + 3,
+                size: Math.random() * 12 + 6,
+                color: colors[Math.random() * colors.length | 0],
+                rot: Math.random() * 360,
+                rotSpeed: (Math.random() - 0.5) * 15
+            });
+        }
+
+        function createFirework() {
+            fireworks.push({
+                x: fxW * 0.2 + Math.random() * (fxW * 0.6),
+                y: fxH,
+                vx: (Math.random() - 0.5) * 6,
+                vy: -(Math.random() * 8 + 15),
+                color: `hsl(${Math.random()*360}, 100%, 50%)`,
+                age: 0
+            });
+        }
+
+        function explodeFirework(f) {
+            for(let i=0; i<60; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 8 + 2;
+                particles.push({
+                    x: f.x, y: f.y,
+                    vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+                    size: Math.random() * 5 + 2,
+                    color: f.color,
+                    life: 1.0, decay: Math.random() * 0.015 + 0.01,
+                    type: 'spark'
+                });
+            }
+        }
+
+        function drawFX() {
+            fxCtx.clearRect(0, 0, fxW, fxH);
+            
+            if (surpriseTriggered) {
+                if (Math.random() < 0.3) createConfetti();
+                if (Math.random() < 0.05) createFirework();
+            }
+
+            for (let i = fireworks.length - 1; i >= 0; i--) {
+                let f = fireworks[i];
+                f.x += f.vx; f.y += f.vy; f.vy += 0.25; 
+                
+                fxCtx.fillStyle = f.color;
+                fxCtx.beginPath(); fxCtx.arc(f.x, f.y, 4, 0, Math.PI * 2); fxCtx.fill();
+
+                if (f.vy >= 0 || f.age > 70) {
+                    explodeFirework(f);
+                    fireworks.splice(i, 1);
+                }
+                f.age++;
+            }
+
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx; p.y += p.vy; p.vy += 0.15;
+                
+                if (p.type === 'spark') {
+                    p.life -= p.decay;
+                    fxCtx.globalAlpha = p.life > 0 ? p.life : 0;
+                    fxCtx.fillStyle = p.color;
+                    fxCtx.beginPath(); fxCtx.arc(p.x, p.y, p.size, 0, Math.PI*2); fxCtx.fill();
+                    fxCtx.globalAlpha = 1.0;
+                    if (p.life <= 0) particles.splice(i, 1);
+                } else {
+                    p.vx *= 0.98; p.rot += p.rotSpeed;
+                    fxCtx.save();
+                    fxCtx.translate(p.x, p.y); fxCtx.rotate(p.rot * Math.PI / 180);
+                    fxCtx.fillStyle = p.color;
+                    fxCtx.fillRect(-p.size/2, -p.size/2, p.size, p.size);
+                    fxCtx.restore();
+                    if (p.y > fxH + 20) particles.splice(i, 1);
+                }
+            }
+            requestAnimationFrame(drawFX);
+        }
+
+        function initFireworks() { drawFX(); }
+
+    </script>
+</body>
+</html>
